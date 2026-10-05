@@ -1,0 +1,3 @@
+# Node.js と pnpm は flake.nix が提供する。mise はこのディレクトリで管理しない (docs/decisions.md D14)
+[settings]
+disable_tools = ["node", "pnpm"]
