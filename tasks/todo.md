@@ -1,53 +1,38 @@
 # TS7 環境構築プラン
 
-## 決定事項
+設計判断と理由は [docs/decisions.md](../docs/decisions.md) (D1〜D19) を参照。
 
-| 領域 | 採用 | 備考 |
-|---|---|---|
-| 環境管理 | Nix flake devShell + direnv (`use flake`) | このディレクトリでは mise を使わない |
-| Runtime | Node.js 26 (nixpkgs-unstable `nodejs_26` 26.10.0) | 2026-10 下旬に LTS 入り予定 |
-| Package manager | pnpm (nixpkgs 12.3.4) + `packageManager: pnpm@12.8.1` | pnpm 自身がバージョンを切り替える |
-| Language | TypeScript 7.0.2 | 型チェック専用 (`noEmit`) |
-| Test | Vitest 5.0.3 + @vitest/coverage-v8 | |
-| Lint | oxlint 1.86 + oxlint-tsgolint 7.0.x (type-aware) | |
-| Format | oxfmt 0.71 | 0.x の実験枠 |
-| 実行 | Node native type stripping (`node src/index.ts`) | bundler なし |
-| 構成 | 単一パッケージ (src/, test/) | |
+## 構成
+
+| 領域            | 採用                                                        | 判断     |
+| --------------- | ----------------------------------------------------------- | -------- |
+| 環境管理        | Nix flake devShell + direnv。mise は `mise.toml` で無効化   | D1, D14  |
+| Runtime         | Node.js 26 (nixpkgs-unstable `nodejs_26`)                   | D2, D17  |
+| Package manager | pnpm (nixpkgs) + `devEngines.packageManager` でガード       | D16      |
+| Language        | TypeScript 7.0.2 (`noEmit`、`.ts` 拡張子で import)          | D6, D7   |
+| Test            | Vitest 5.0.3 + coverage-v8 (閾値 80%)、テストはソースと並置 | D8, D9   |
+| Lint            | oxlint 1.86 + oxlint-tsgolint (type-aware、typeCheck 無効)  | D10, D19 |
+| Format          | oxfmt 0.71 (デフォルト設定)                                 | D3, D11  |
+| Editor          | VS Code 設定をコミット (TS7 拡張 + Oxc + direnv)            | D18      |
+| 構成            | 単一パッケージ                                              | D4       |
 
 ## タスク
 
-- [ ] `git init` + `.gitignore` (node_modules, coverage, .direnv, result)
-- [ ] `flake.nix` (nixpkgs-unstable, devShell: nodejs_26, pnpm) + `flake.lock`
-- [ ] `.envrc` (`use flake`) → `direnv allow`
-- [ ] `package.json` (type: module, packageManager, engines, scripts)
-- [ ] devDependencies を pnpm add (exact pin)
-- [ ] `tsconfig.json` (NodeNext, strict, erasableSyntaxOnly, verbatimModuleSyntax, noUncheckedIndexedAccess, exactOptionalPropertyTypes, noEmit)
-- [ ] `vitest.config.ts` (coverage v8, threshold 80%)
-- [ ] `.oxlintrc.json` (type-aware 有効)
-- [ ] `.oxfmtrc.json`
-- [ ] サンプル `src/index.ts` + `test/*.test.ts` で疎通確認
-- [ ] 検証: `node src/index.ts` / `pnpm typecheck` / `pnpm lint` / `pnpm format:check` / `pnpm test:run` / `pnpm test:coverage` がすべて通る
-- [ ] 検証: 型エラー・floating promise を意図的に仕込み、tsc と tsgolint が検出することを確認
+- [x] `git init` + `.gitignore`
+- [x] `flake.nix` + `flake.lock` + `.envrc` + `mise.toml` → node 26.10.0 / pnpm 12.3.4 が Nix store から解決されることを確認
+- [x] `package.json` (devEngines, scripts) + devDependencies (exact pin)
+- [x] `tsconfig.json` / `vitest.config.ts` / `.oxlintrc.json` / `.oxfmtrc.json`
+- [x] `.vscode/` + プロジェクト `CLAUDE.md`
+- [x] 検証: `node src/index.ts` / `typecheck` / `lint` / `format:check` が通る
+- [x] 検証: devEngines のガードが node / pnpm の版不一致でエラーになる
+- [x] 検証: 型エラーは tsc のみ、floating promise は oxlint のみが検出する
+- [ ] retry の最初のテスト (seam 合意後) で `test:run` / `test:coverage` / `check` を通す
 
-## scripts (予定)
+## 後回し
 
-```
-dev            node --watch src/index.ts
-typecheck      tsc
-test           vitest
-test:run       vitest run
-test:coverage  vitest run --coverage
-lint           oxlint --type-aware
-format         oxfmt
-format:check   oxfmt --check
-check          typecheck && lint && format:check && test:run
-```
-
-## 後回し (今回やらない)
-
-- GitHub Actions (`nix develop -c pnpm check`)
+- GitHub Actions (`nix develop -c pnpm run check`)、flake.lock の自動更新
 - lefthook 等の git hooks
-- `node:test` / Bun / Deno 比較実験
+- `node:test` / Bun / Deno / Biome 比較実験
 
 ## Review
 
