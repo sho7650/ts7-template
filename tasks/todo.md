@@ -26,7 +26,7 @@
 - [x] 検証: `node src/index.ts` / `typecheck` / `lint` / `format:check` が通る
 - [x] 検証: devEngines のガードが node / pnpm の版不一致でエラーになる
 - [x] 検証: 型エラーは tsc のみ、floating promise は oxlint のみが検出する
-- [ ] retry の最初のテスト (seam 合意後) で `test:run` / `test:coverage` / `check` を通す
+- [x] retry の最初のテスト (seam 合意後) で `test:run` / `test:coverage` / `check` を通す
 
 ## 後回し
 
@@ -36,4 +36,11 @@
 
 ## Review
 
-(完了後に記入)
+- `direnv exec . pnpm run check` が exit 0、警告ゼロ、カバレッジ 100% (retry 3 テスト)。
+- 3 層の責務分担を実証: 型エラーは tsc だけ、`no-floating-promises` は oxlint (type-aware) だけが検出した。
+- devEngines のガードは node / pnpm の版不一致で `ERR_PNPM_BAD_RUNTIME_VERSION` / `ERR_PNPM_BAD_PM_VERSION` を出して止まる。
+- 気づいた点:
+  - pnpm 12 は `-s` を持たない。`pnpm run <script>` を使う。
+  - oxfmt は package.json のキーを並べ替え、Markdown も整形対象にする。
+  - Vitest の fake timers は `node:timers/promises` の `setTimeout` も制御できる。
+  - pnpm が `curl ... | sh` での更新を勧める通知を出すが、D16 に反するので従わない (`nix flake update` で追従する)。
