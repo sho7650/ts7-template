@@ -1,0 +1,23 @@
+{
+  // 設計判断は docs/decisions.md (D6, D7) を参照
+  "compilerOptions": {
+    "target": "esnext",
+    "module": "nodenext",
+    "types": ["node"],
+
+    // emit せず Node の type stripping で直接実行する (D6)
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true,
+
+    // TS7 では既定で true だが、設計意図として明示する (D7)
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src", "*.config.ts"]
+}

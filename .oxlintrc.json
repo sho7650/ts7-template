@@ -1,0 +1,21 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "import"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error",
+    "pedantic": "warn"
+  },
+  "options": {
+    "typeAware": true,
+    "typeCheck": false
+  },
+  "overrides": [
+    {
+      "files": ["src/**/*.test.ts"],
+      "plugins": ["typescript", "unicorn", "import", "vitest"]
+    }
+  ],
+  "ignorePatterns": ["coverage/**"]
+}
