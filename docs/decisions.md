@@ -1,98 +1,108 @@
-# 設計判断ログ
+# Design decisions
 
-環境構築時に決めたことと、その理由の記録。判断を変えたときは該当項目を更新し、変更理由を追記する。
+A record of what this template decided and why. When a decision changes, update its entry and note the reason for the change.
 
-## D1. 環境管理: Nix flake devShell + direnv。このディレクトリでは mise を使わない
+## D1. Environment: Nix flake dev shell + direnv; mise does not manage this project
 
-- **決定**: Node.js と pnpm は `flake.nix` の devShell が提供し、direnv (`use flake`) で自動ロードする。
-- **理由**: tsgo / oxlint / oxfmt は npm 経由でネイティブバイナリが入るため、Nix の価値は「Node/pnpm 本体のバージョン固定」と「CI でも `nix develop` で同一環境を再現できること」にある。mise と Nix の両方に Node を管理させると真実の源が二重になり、どちらの Node が動いているか分からなくなるので、このディレクトリでは Nix に一本化する。
+- **Decision**: Node.js and pnpm come from the dev shell in `flake.nix`, loaded automatically by direnv (`use flake`).
+- **Why**: The TypeScript 7 compiler, oxlint and oxfmt ship native binaries through npm, so Nix adds value only by pinning the Node.js and pnpm binaries and by reproducing the same environment in CI with `nix develop`. Letting both mise and Nix manage Node.js creates two sources of truth and makes it unclear which Node.js is running, so this project relies on Nix alone.
 
 ## D2. Runtime: Node.js 26
 
-- **決定**: nixpkgs-unstable の `nodejs_26` を使う。
-- **理由**: グローバル環境 (mise) も 26 で揃っており、2026-10 下旬に LTS 入りする予定のため安定性の懸念は小さい。最新機能を追うという目的にも合う。
+- **Decision**: Use `nodejs_26` from nixpkgs-unstable.
+- **Why**: Node.js 26 is scheduled to enter LTS in late October 2026, so stability is a small concern, and it matches the goal of tracking current features.
 
 ## D3. Formatter: oxfmt
 
-- **決定**: oxfmt (0.x) を使う。
-- **理由**: lint (oxlint) と format を Oxc ツールチェーンに統一できる。0.x で実験的だが、「最新ツールチェーンを触る」というこのリポジトリの目的にはむしろ合っている。Biome は安定版の比較対象として後で試せる。
+- **Decision**: Use oxfmt (0.x).
+- **Why**: It unifies linting (oxlint) and formatting on the Oxc toolchain. It is still 0.x and experimental, which fits the goal of exploring the latest toolchain. Biome remains available as a stable point of comparison.
 
-## D4. リポジトリ構成: 単一パッケージ
+## D4. Repository layout: single package
 
-- **決定**: workspace にせず、単一パッケージで始める。
-- **理由**: 最初から monorepo にすると設定量が増え、TS7 そのものが見えにくくなる。必要になったら pnpm workspace へ分割できる。
+- **Decision**: Start as a single package rather than a workspace.
+- **Why**: A monorepo from day one adds configuration and obscures TypeScript 7 itself. Splitting into a pnpm workspace later is straightforward.
 
-## D5. nixpkgs の更新方針: 当面は手動、CI 導入後に自動化
+## D5. nixpkgs updates: manual for now
 
-- **決定**: `flake.lock` で nixpkgs-unstable のコミットを固定し、`nix flake update` は手動で行う。CI 導入後は Renovate / GitHub Actions で週次の自動更新に移行する。
-- **理由**: 実験場なので日単位の鮮度は不要。Nix が持つのは Node/pnpm だけなので、lock が古くなってもリスクは小さい。
+- **Decision**: `flake.lock` pins a nixpkgs-unstable commit, and `nix flake update` is run manually. Automated weekly updates (Renovate or GitHub Actions) are deferred.
+- **Why**: Day-level freshness is unnecessary, and Nix provides only Node.js and pnpm, so a stale lock carries little risk.
 
-## D6. emit しない。import は `.ts` 拡張子
+## D6. No emit; import with `.ts` extensions
 
-- **決定**: `noEmit: true` + `allowImportingTsExtensions: true`。import は `./foo.ts` と書き、`node src/x.ts` で直接実行する。`rewriteRelativeImportExtensions` は使わない。
-- **理由**: 動かすだけの実験場では「トランスパイル工程ゼロ」の思想が最もきれいに出る。`rewriteRelativeImportExtensions` は emit 時にしか効かないため、noEmit では意味がない (当初プランの誤りを修正)。ライブラリ公開が必要になったら `tsconfig.build.json` を別途用意する。
+- **Decision**: `noEmit: true` + `allowImportingTsExtensions: true`. Imports are written as `./foo.ts` and files run directly with `node src/x.ts`. `rewriteRelativeImportExtensions` is not used.
+- **Why**: For code that only needs to run, a zero-transpile workflow is the cleanest expression of Node.js type stripping. `rewriteRelativeImportExtensions` only takes effect when emitting, so it is meaningless with `noEmit`. Add a separate `tsconfig.build.json` if the project ever needs to publish a library.
 
-## D7. tsconfig の厳しさ
+## D7. tsconfig strictness
 
-- **決定**: `strict` + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` + `noImplicitOverride` + `noImplicitReturns` + `noFallthroughCasesInSwitch`。`noUnusedLocals/Parameters` は使わない。
-- **理由**: 型安全性を最大限に上げつつ、未使用変数の検出は oxlint の `no-unused-vars` に任せる (TDD 途中の一時的な未使用を warn で段階的に扱えるため)。`noPropertyAccessFromIndexSignature` は得られる安全性に比べてノイズが多く、`isolatedDeclarations` はライブラリ向けの設定なので不要。TS7 では `strict` はデフォルトで true だが、設定ファイルを設計意図のドキュメントにするため明示する。
+- **Decision**: `strict` + `noUncheckedIndexedAccess` + `exactOptionalPropertyTypes` + `noImplicitOverride` + `noImplicitReturns` + `noFallthroughCasesInSwitch`. `noUnusedLocals/Parameters` are not used.
+- **Why**: Maximize type safety while leaving unused-variable detection to oxlint's `no-unused-vars`, which can report temporary unused code during TDD as a warning. `noPropertyAccessFromIndexSignature` adds more noise than safety, and `isolatedDeclarations` targets libraries. `strict` is already the default in TypeScript 7 but is stated explicitly so the config documents its intent.
 
-## D8. テストはソースと同じ場所に置く
+## D8. Tests live next to the source
 
-- **決定**: `src/foo.ts` と `src/foo.test.ts` を並べる。
-- **理由**: TDD の RED→GREEN で対象と仕様を行き来しやすい。実験が増えたときもフォルダ単位で丸ごと消せる。Vitest や oxlint の設定は `*.test.ts` のパターンで区別できる。
+- **Decision**: Place `src/foo.ts` and `src/foo.test.ts` side by side.
+- **Why**: It makes moving between the code and its specification fast during red → green, and a feature can be deleted as one folder. Vitest and oxlint distinguish tests by the `*.test.ts` pattern.
 
-## D9. カバレッジ 80% の閾値を初日から強制する
+## D9. Enforce an 80% coverage threshold from day one
 
-- **決定**: `vitest.config.ts` に threshold 80% を設定し、`pnpm check` で下回れば失敗させる。
-- **理由**: TDD なら自然に 100% 近くになるはずで、下回ったら「テストを先に書かなかった」というシグナルになる。テストファーストの原則を仕組みで担保する。
+- **Decision**: Set an 80% threshold in `vitest.config.ts` so `pnpm run check` fails below it.
+- **Why**: With TDD, coverage should naturally stay near 100%. Falling below the threshold signals code written without a test first, so the tooling enforces test-first.
 
-## D10. oxlint のルール強度
+## D10. oxlint rule strength
 
-- **決定**: correctness + suspicious + perf を error、pedantic を warn にする。plugin は `typescript` / `unicorn` / `import` / `vitest`。type-aware を有効にする。style と nursery は使わない。
-- **理由**: `no-floating-promises` などの type-aware ルールがこの構成の目玉。style は formatter と重複し、nursery は不安定なので除外する。pedantic は有用だが誤検知もあるため warn に留める。
+- **Decision**: correctness, suspicious and perf as errors; pedantic as warnings. Plugins: `typescript`, `unicorn`, `import`, `vitest`. Type-aware linting enabled. style and nursery are not used.
+- **Why**: Type-aware rules such as `no-floating-promises` are the main attraction. style overlaps with the formatter and nursery is unstable. pedantic is useful but produces false positives, so it stays at warning level.
 
-## D11. oxfmt のスタイル: デフォルト
+## D11. oxfmt style: defaults
 
-- **決定**: Prettier 互換のデフォルト (ダブルクォート、セミコロンあり、幅 80) のまま使う。
-- **理由**: 設定を変えるほどツール自体の学習から離れる。デフォルトのままなら Biome / Prettier との比較もしやすい。
+- **Decision**: Keep the Prettier-compatible defaults (double quotes, semicolons, width 80).
+- **Why**: Customizing moves away from learning the tool itself, and defaults make comparisons with Biome or Prettier easier.
 
-## D12. Git: ステップごとにコミットする
+## D12. Git: commit step by step
 
-- **決定**: flake → package.json → 各 config のように段階的にコミットする。
-- **理由**: 学習用の実験場なので、`git log` が「環境をどう組み立てたか」の記録として後から振り返れる。
+- **Decision**: Commit in small steps (flake, then package.json, then each config, and so on).
+- **Why**: The history then documents how the environment was assembled and is easy to review later.
 
-## D13. 疎通確認を兼ねた最初の TDD 題材: リトライ制御
+## D13. Sample code: a minimal `greet` function
 
-- **決定**: 疎通確認はリトライ制御 (`retry`) の最初の数テストで行う。
-- **理由**: 非同期処理を含むため、type-aware lint の目玉である `no-floating-promises` と Vitest の fake timers (`vi.useFakeTimers`) を自然に試せる。環境全体の価値を一度に確認できる。今回は疎通確認に必要な最小限のテストに留め、本格的な実装は別タスクにする。
+- **Decision**: Ship `src/greet.ts` with one test, and call it from `src/index.ts` via `import { greet } from "./greet.ts"`.
+- **Why**: Projects created from this template will delete the sample first, so it should be minimal and domain-neutral. It still demonstrates a passing `check` pipeline and running a `.ts` import directly with `node`. (The initial environment check used a `retry` function; it was replaced when the repository became a public template.)
 
-## D14. mise をこのディレクトリで明示的に無効化する
+## D14. Disable mise explicitly in this directory
 
-- **決定**: プロジェクト直下に `mise.toml` を置き、`[settings] disable_tools = ["node", "pnpm"]` を設定する (`mise trust` が必要)。
-- **理由**: fish では direnv の PATH が mise より前に来るため現状でも flake の node が使われるが、それは hook の登録順に依存した偶然であり、mise 公式も direnv との併用を "unsupported" としている。mise 自身に「ここでは管理しない」と宣言させることで順序依存をなくす。グローバル設定 (`.miserc.toml`) は変更しない。
+- **Decision**: Commit a `mise.toml` with `[settings] disable_tools = ["node", "pnpm"]`. Developers who use mise need to run `mise trust` once.
+- **Why**: If a developer's global mise config manages Node.js or pnpm, mise and direnv both modify `PATH`, and which binary wins depends on shell hook order. mise documents using it together with direnv as unsupported. Declaring in the repository that mise does not manage these tools removes the dependence on hook order without touching anyone's global config. The file has no effect for developers who do not use mise.
 
-## D15. Claude Code からのコマンドは `direnv exec .` 経由で実行する
+## D15. Non-interactive shells run commands through `direnv exec .`
 
-- **決定**: Claude Code (zsh, 非対話) からは `direnv exec . pnpm ...` の形で実行し、このルールをプロジェクトの `CLAUDE.md` に明記する。
-- **理由**: Claude Code の zsh には direnv hook がなく、非対話シェルなので `.zshrc` に hook を足しても発火しない。そのままだと mise の node が使われ、D1 の「真実の源は一つ」が崩れる。nix-direnv のキャッシュがあるので `nix develop -c` より高速。
+- **Decision**: Tools that run commands in a non-interactive shell without a direnv hook (AI coding agents, scripts) use `direnv exec . pnpm ...`. This rule is stated in `CLAUDE.md`.
+- **Why**: Without a direnv hook the flake environment is not loaded, and a globally installed Node.js may run instead, breaking D1's single source of truth. With nix-direnv's cache it is faster than `nix develop --command`.
 
-## D16. pnpm は nixpkgs のものをそのまま使い、devEngines でガードする
+## D16. Use pnpm from nixpkgs as is, guarded by devEngines
 
-- **決定**: `packageManager` フィールドは使わず、`devEngines.packageManager: { name: "pnpm", version: "^12.3.0", onFail: "error" }` でバージョンを検証のみ行う。
-- **理由**: pnpm 11+ では `packageManager` に版を書くと既定 (`pmOnFail: download`) で pnpm が自分で別バージョンをダウンロードして切り替えるため、Nix の pnpm が単なるブートストラップになり D1 と矛盾する。nixpkgs は数マイナー遅れるが実験場では影響が小さく、`nix flake update` (D5) で追従できる。最新版が必要になったら flake の overlay で固定する。
+- **Decision**: Do not use the `packageManager` field. Validate the version only, with `devEngines.packageManager: { name: "pnpm", version: "^12.3.0", onFail: "error" }`.
+- **Why**: Since pnpm 11, a version in `packageManager` makes pnpm download and switch to that version by default (`pmOnFail: download`), which turns the Nix-provided pnpm into a mere bootstrap and contradicts D1. nixpkgs lags a few minor versions, which matters little here, and it catches up with `nix flake update` (D5). If the latest version is required, pin it with a flake overlay.
 
-## D17. Node のバージョンを devEngines.runtime でガードする
+## D17. Guard the Node.js version with devEngines.runtime
 
-- **決定**: `devEngines.runtime: { name: "node", version: "^26", onFail: "error" }`。
-- **理由**: flake 環境外で誤って実行したときに即座に気づける。D16 と同じ仕組みで統一でき、`onFail: "error"` なのでダウンロードは起きず Nix 一本化 (D1) を維持できる。
+- **Decision**: `devEngines.runtime: { name: "node", version: "^26", onFail: "error" }`.
+- **Why**: Running outside the flake environment by mistake fails immediately. It uses the same mechanism as D16, and `onFail: "error"` never downloads anything, so Nix remains the single source of truth (D1).
 
-## D18. VS Code 設定をリポジトリにコミットする
+## D18. Commit VS Code settings
 
-- **決定**: `.vscode/extensions.json` で TypeScript 7 (`TypeScriptTeam.native-preview`)・Oxc・direnv 拡張を推奨し、`.vscode/settings.json` で `js/ts.experimental.useTsgo: true`、`js/ts.tsdk.path: "node_modules/typescript"`、Oxc を formatter、保存時フォーマットを設定する。
-- **理由**: TS7 拡張は TypeScript を同梱しており、`tsdk.path` を指定しないとエディタと CLI で TS のバージョンがずれ得る。設定をリポジトリに置くことで設計意図のドキュメントにもなる。
+- **Decision**: `.vscode/extensions.json` recommends the TypeScript 7 (`TypeScriptTeam.native-preview`), Oxc and direnv extensions. `.vscode/settings.json` sets `js/ts.experimental.useTsgo: true`, `js/ts.tsdk.path: "node_modules/typescript"`, Oxc as the formatter and format on save.
+- **Why**: The TypeScript 7 extension bundles its own TypeScript, so without `tsdk.path` the editor and CLI can run different versions. Keeping the settings in the repository also documents the design.
 
-## D19. oxlint / oxfmt の設定と責務分担
+## D19. oxlint / oxfmt configuration and responsibilities
 
-- **決定**: `.oxlintrc.json` (JS/TS 設定形式は experimental のため不採用) に `options.typeAware: true`、`options.typeCheck: false` を設定する。oxfmt はデフォルトのまま `.oxfmtrc.json` を `--init` で生成する。
-- **理由**: type-aware を設定ファイル側に書くとエディタ連携でも有効になる。`typeCheck` を切るのは「型エラーは tsc、怪しいコードは oxlint」という責務境界を保つため (同じエラーを二つのツールが報告すると誰が責任を持つか曖昧になる)。`.oxfmtrc.json` は中身がデフォルトでも「このツールを使っている」ことを明示する役割がある。
+- **Decision**: `.oxlintrc.json` (the JS/TS config format is experimental) sets `options.typeAware: true` and `options.typeCheck: false`. oxfmt keeps its defaults in an `.oxfmtrc.json` generated by `--init`.
+- **Why**: Setting type-aware in the config file also enables it in editor integrations. `typeCheck` stays off to keep the boundary "type errors belong to tsc, suspicious code belongs to oxlint"; two tools reporting the same error blurs ownership. `.oxfmtrc.json` makes it explicit which formatter the project uses, even with default contents.
+
+## D20. CI: GitHub Actions with upstream Nix on Ubuntu
+
+- **Decision**: `.github/workflows/ci.yml` runs on pushes to `main` and on pull requests, on `ubuntu-latest` only, with `permissions: contents: read`. Steps: `actions/checkout@v7` → `cachix/install-nix-action@v31` → `nix flake check` → `nix develop --command pnpm install --frozen-lockfile` → `nix develop --command pnpm run check`. No extra caching. Actions are pinned by major tag. Automated dependency updates (Dependabot / Renovate) are deferred along with D5.
+- **Why**: `cachix/install-nix-action` installs upstream Nix, matching local development; `DeterminateSystems/nix-installer-action` installs Determinate Nix by default and calls upstream Nix "not a supported configuration". macOS runners are expensive and `aarch64-darwin` is covered locally. Node.js and pnpm come from cache.nixos.org quickly enough that extra caching is not worth the complexity yet.
+
+## D21. Public template: MIT license, no Intel Mac support
+
+- **Decision**: Publish under the MIT license. The flake supports `aarch64-darwin`, `aarch64-linux` and `x86_64-linux`; `x86_64-darwin` is dropped.
+- **Why**: Without a license others cannot legally reuse the template. The pinned nixpkgs-unstable no longer evaluates for `x86_64-darwin` (see the nixpkgs 26.11 release notes), so listing it would make `nix flake check --all-systems` fail.

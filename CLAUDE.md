@@ -1,10 +1,10 @@
-# trial-ts7
+# ts7-template
 
-TypeScript 7 の実験場。設計判断とその理由は `docs/decisions.md` にある。構成を変えるときは先に読み、変えたら追記する。
+A TypeScript 7 project template. Design decisions and their reasons live in `docs/decisions.md`. Read it before changing the setup, and record any change there.
 
-## コマンドの実行
+## Running commands
 
-Node.js と pnpm は `flake.nix` が提供する。Claude Code のシェル (zsh, 非対話) には direnv hook がないため、**必ず `direnv exec .` を前置する** (D15)。前置しないと mise の node が使われる。
+Node.js and pnpm come from `flake.nix`. Agent shells are non-interactive and have no direnv hook, so **always prefix commands with `direnv exec .`** (D15). Without the prefix, a globally installed Node.js may run instead.
 
 ```sh
 direnv exec . pnpm run check      # typecheck → lint → format:check → test:coverage
@@ -12,12 +12,12 @@ direnv exec . pnpm run test:run
 direnv exec . node src/index.ts
 ```
 
-pnpm 12 は `-s` オプションを持たない。
+pnpm 12 has no `-s` flag; use `pnpm run <script>`.
 
-## 責務分担
+## Responsibilities
 
-- 実行: Node の type stripping (`node src/x.ts`)。emit しない
-- 型エラー: `tsc` (TypeScript 7)
-- 怪しいコード: `oxlint` (type-aware、`typeCheck` は無効)
-- 整形: `oxfmt`
-- 振る舞い: `vitest`。テストは `src/**/*.test.ts` にソースと並べて置く
+- Running: Node.js type stripping (`node src/x.ts`); nothing is emitted
+- Type errors: `tsc` (TypeScript 7)
+- Suspicious code: `oxlint` (type-aware, `typeCheck` disabled)
+- Formatting: `oxfmt`
+- Behavior: `vitest`; tests live next to the source as `src/**/*.test.ts`
