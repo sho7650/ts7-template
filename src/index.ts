@@ -1,3 +1,3 @@
-const runtime = `Node.js ${process.version}`;
+import { greet } from "./greet.ts";
 
-console.log(`Hello from TypeScript 7 on ${runtime}`);
+console.log(greet(`TypeScript 7 on Node.js ${process.version}`));
