@@ -1,0 +1,22 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: cachix/install-nix-action@v31
+      - name: Check flake
+        run: nix flake check
+      - name: Install dependencies
+        run: nix develop --command pnpm install --frozen-lockfile
+      - name: Run checks
+        run: nix develop --command pnpm run check
