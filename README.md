@@ -26,7 +26,7 @@ Supported systems: `aarch64-darwin`, `aarch64-linux`, `x86_64-linux`.
 
 ## Getting started
 
-Create a repository from this template (on GitHub, **Use this template**, or `gh repo create <name> --template <owner>/ts7-template`), then:
+Create a repository from this template (on GitHub, **Use this template**, or `gh repo create <name> --template sho7650/ts7-template`), then:
 
 ```sh
 direnv allow          # loads Node.js and pnpm from flake.nix
